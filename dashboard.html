@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL — AI Ransomware Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #020408;
+    --bg2: #040d14;
+    --panel: #060f18;
+    --border: #0a2a3a;
+    --cyan: #00f5ff;
+    --red: #ff2052;
+    --yellow: #ffd700;
+    --green: #00ff88;
+    --orange: #ff6b00;
+    --text: #a0c8d8;
+    --text-dim: #3a6070;
+    --glow-cyan: 0 0 20px rgba(0,245,255,0.4);
+    --glow-red: 0 0 20px rgba(255,32,82,0.5);
+    --glow-green: 0 0 20px rgba(0,255,136,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline effect */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,245,255,0.015) 2px,
+      rgba(0,245,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Grid background */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      linear-gradient(rgba(0,245,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 0 30px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 30px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    border: 2px solid var(--cyan);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    box-shadow: var(--glow-cyan);
+    animation: pulse-border 2s ease-in-out infinite;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    background: rgba(0,245,255,0.05);
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: var(--glow-cyan); }
+    50% { box-shadow: 0 0 40px rgba(0,245,255,0.7); }
+  }
+
+  .logo-text h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--cyan);
+    letter-spacing: 6px;
+    text-shadow: var(--glow-cyan);
+  }
+
+  .logo-text p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: var(--glow-green);
+    animation: blink 1.5s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .clock {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    color: var(--cyan);
+    letter-spacing: 2px;
+  }
+
+  /* THREAT LEVEL BANNER */
+  .threat-banner {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--green);
+    padding: 20px 30px;
+    margin-bottom: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.5s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .threat-banner::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(90deg, rgba(0,255,136,0.03) 0%, transparent 60%);
+    transition: all 0.5s ease;
+  }
+
+  .threat-banner.medium {
+    border-left-color: var(--yellow);
+  }
+  .threat-banner.medium::before {
+    background: linear-gradient(90deg, rgba(255,215,0,0.05) 0%, transparent 60%);
+  }
+
+  .threat-banner.high {
+    border-left-color: var(--red);
+    animation: threat-pulse 1s ease-in-out infinite;
+  }
+  .threat-banner.high::before {
+    background: linear-gradient(90deg, rgba(255,32,82,0.08) 0%, transparent 60%);
+  }
+
+  @keyframes threat-pulse {
+    0%, 100% { box-shadow: none; }
+    50% { box-shadow: 0 0 30px rgba(255,32,82,0.2); }
+  }
+
+  .threat-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .threat-level-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 32px;
+    font-weight: 900;
+    color: var(--green);
+    letter-spacing: 4px;
+    text-shadow: var(--glow-green);
+    transition: all 0.5s ease;
+  }
+
+  .threat-banner.medium .threat-level-text { color: var(--yellow); text-shadow: 0 0 20px rgba(255,215,0,0.5); }
+  .threat-banner.high .threat-level-text { color: var(--red); text-shadow: var(--glow-red); }
+
+  .ai-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .ai-prediction {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .ai-result {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: 3px;
+  }
+
+  .ai-result.malware { color: var(--red); text-shadow: var(--glow-red); }
+
+  .confidence-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .confidence-bar {
+    width: 120px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 2px;
+    transition: width 0.8s ease;
+    box-shadow: var(--glow-green);
+  }
+
+  .confidence-fill.malware { background: var(--red); box-shadow: var(--glow-red); }
+
+  .confidence-pct {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--cyan);
+  }
+
+  /* STATS GRID */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 30px;
+  }
+
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s ease;
+  }
+
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 40px; height: 40px;
+    border-top: 1px solid var(--cyan);
+    border-right: 1px solid var(--cyan);
+    opacity: 0.3;
+  }
+
+  .stat-card:hover {
+    border-color: var(--cyan);
+  }
+
+  .stat-icon {
+    font-size: 20px;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .stat-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--cyan);
+    letter-spacing: 2px;
+    line-height: 1;
+    margin-bottom: 8px;
+    text-shadow: var(--glow-cyan);
+    transition: all 0.3s ease;
+  }
+
+  .stat-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .stat-card.danger .stat-value { color: var(--red); text-shadow: var(--glow-red); }
+  .stat-card.warning .stat-value { color: var(--yellow); text-shadow: 0 0 20px rgba(255,215,0,0.4); }
+  .stat-card.success .stat-value { color: var(--green); text-shadow: var(--glow-green); }
+
+  /* MAIN CONTENT */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+  }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0,245,255,0.02);
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--cyan);
+    text-transform: uppercase;
+  }
+
+  .panel-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+  }
+
+  /* ALERT FEED */
+  .alert-feed {
+    height: 400px;
+    overflow-y: auto;
+    padding: 10px;
+  }
+
+  .alert-feed::-webkit-scrollbar {
+    width: 4px;
+  }
+  .alert-feed::-webkit-scrollbar-track { background: var(--bg); }
+  .alert-feed::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .alert-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    border-left: 2px solid var(--border);
+    animation: slide-in 0.3s ease;
+    transition: background 0.2s;
+  }
+
+  .alert-item:hover { background: rgba(0,245,255,0.03); }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .alert-item.critical { border-left-color: var(--red); }
+  .alert-item.warning { border-left-color: var(--yellow); }
+  .alert-item.info { border-left-color: var(--cyan); }
+  .alert-item.success { border-left-color: var(--green); }
+
+  .alert-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    padding-top: 2px;
+    min-width: 80px;
+  }
+
+  .alert-content {
+    flex: 1;
+  }
+
+  .alert-type {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    margin-bottom: 2px;
+  }
+
+  .alert-item.critical .alert-type { color: var(--red); }
+  .alert-item.warning .alert-type { color: var(--yellow); }
+  .alert-item.info .alert-type { color: var(--cyan); }
+  .alert-item.success .alert-type { color: var(--green); }
+
+  .alert-msg {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.4;
+    word-break: break-all;
+  }
+
+  /* AI PREDICTION HISTORY */
+  .prediction-list {
+    padding: 10px;
+    height: 400px;
+    overflow-y: auto;
+  }
+
+  .prediction-item {
+    padding: 12px 14px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    animation: slide-in 0.3s ease;
+  }
+
+  .prediction-item.malware {
+    border-color: rgba(255,32,82,0.3);
+    background: rgba(255,32,82,0.03);
+  }
+
+  .pred-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+
+  .pred-label.benign { color: var(--green); }
+  .pred-label.malware { color: var(--red); }
+
+  .pred-conf {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .pred-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 3px;
+  }
+
+  /* ENTROPY CHART */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .entropy-display {
+    padding: 20px;
+    height: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+  }
+
+  .entropy-bar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: slide-in 0.3s ease;
+  }
+
+  .entropy-filename {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .entropy-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .entropy-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+
+  .entropy-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    width: 35px;
+    text-align: right;
+  }
+
+  /* PROCESS MONITOR */
+  .process-list {
+    padding: 12px;
+    height: 200px;
+    overflow-y: auto;
+  }
+
+  .process-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .process-item:hover { border-color: var(--border); }
+  .process-item.suspicious {
+    border-color: rgba(255,32,82,0.3);
+    background: rgba(255,32,82,0.03);
+    animation: slide-in 0.3s ease;
+  }
+
+  .proc-name {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .proc-tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    padding: 2px 6px;
+    border: 1px solid;
+  }
+
+  .proc-tag.safe { color: var(--green); border-color: var(--green); }
+  .proc-tag.suspicious { color: var(--red); border-color: var(--red); }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 16px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  .footer-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .footer-text span { color: var(--cyan); }
+
+  /* MALWARE ALERT OVERLAY */
+  .malware-overlay {
+    display: none;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    background: var(--panel);
+    border: 2px solid var(--red);
+    padding: 20px 30px;
+    box-shadow: var(--glow-red), 0 0 60px rgba(255,32,82,0.2);
+    animation: overlay-pulse 0.5s ease-in-out infinite alternate;
+    max-width: 350px;
+  }
+
+  .malware-overlay.show { display: block; }
+
+  @keyframes overlay-pulse {
+    from { box-shadow: var(--glow-red); }
+    to { box-shadow: 0 0 50px rgba(255,32,82,0.6); }
+  }
+
+  .overlay-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    color: var(--red);
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+  }
+
+  .overlay-msg {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  .overlay-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 16px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+  }
+
+  /* Animate numbers */
+  @keyframes count-up {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .updated {
+    animation: count-up 0.3s ease;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🛡</div>
+      <div class="logo-text">
+        <h1>SENTINEL</h1>
+        <p>AI-Powered Ransomware Detection System // AMD Optimized</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-indicator">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText" style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;color:#00ff88;">MONITORING ACTIVE</span>
+      </div>
+      <div class="clock" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- THREAT BANNER -->
+  <div class="threat-banner" id="threatBanner">
+    <div>
+      <div class="threat-label">// Current Threat Level</div>
+      <div class="threat-level-text" id="threatLevelText">LOW</div>
+    </div>
+    <div class="ai-badge">
+      <div class="ai-prediction">// AI MODEL PREDICTION</div>
+      <div class="ai-result" id="aiResult">BENIGN</div>
+      <div class="confidence-bar-wrap">
+        <div class="confidence-bar">
+          <div class="confidence-fill" id="confidenceFill" style="width:100%"></div>
+        </div>
+        <span class="confidence-pct" id="confidencePct">100%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-icon">📁</span>
+      <div class="stat-value" id="statAlerts">0</div>
+      <div class="stat-label">Total Alerts</div>
+    </div>
+    <div class="stat-card danger">
+      <span class="stat-icon">🔐</span>
+      <div class="stat-value" id="statRenames">0</div>
+      <div class="stat-label">Suspicious Renames</div>
+    </div>
+    <div class="stat-card warning">
+      <span class="stat-icon">🔥</span>
+      <div class="stat-value" id="statEntropy">0</div>
+      <div class="stat-label">High Entropy Files</div>
+    </div>
+    <div class="stat-card success">
+      <span class="stat-icon">🤖</span>
+      <div class="stat-value" id="statScans">0</div>
+      <div class="stat-label">AI Scans Run</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+    <!-- ALERT FEED -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">// Live Alert Feed</span>
+        <span class="panel-badge" id="alertCount">0 EVENTS</span>
+      </div>
+      <div class="alert-feed" id="alertFeed">
+        <div style="padding:40px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:2px;">
+          AWAITING ACTIVITY...
+        </div>
+      </div>
+    </div>
+
+    <!-- AI PREDICTIONS -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">// AI Predictions</span>
+        <span class="panel-badge">EVERY 5s</span>
+      </div>
+      <div class="prediction-list" id="predictionList">
+        <div style="padding:20px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;">
+          MODEL INITIALIZING...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM GRID -->
+  <div class="bottom-grid">
+    <!-- ENTROPY MONITOR -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">// Entropy Monitor</span>
+        <span class="panel-badge">THRESHOLD: 7.2</span>
+      </div>
+      <div class="entropy-display" id="entropyDisplay">
+        <div style="padding:20px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;">
+          NO HIGH ENTROPY FILES DETECTED
+        </div>
+      </div>
+    </div>
+
+    <!-- PROCESS MONITOR -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">// Process Monitor</span>
+        <span class="panel-badge" id="procCount">SCANNING...</span>
+      </div>
+      <div class="process-list" id="processList">
+        <div style="padding:20px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;">
+          SCANNING PROCESSES...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-text">SENTINEL v1.0 // <span>AMD GPU ACCELERATED</span> // RANDOM FOREST MODEL // <span>99% ACCURACY</span></div>
+    <div class="footer-text">MODEL: <span>RandomForestClassifier</span> // DATASET: <span>21,752 SAMPLES</span> // FEATURES: <span>18</span></div>
+  </footer>
+</div>
+
+<!-- MALWARE ALERT OVERLAY -->
+<div class="malware-overlay" id="malwareOverlay">
+  <button class="overlay-close" onclick="document.getElementById('malwareOverlay').classList.remove('show')">✕</button>
+  <div class="overlay-title">⚠ RANSOMWARE DETECTED</div>
+  <div class="overlay-msg" id="overlayMsg">High confidence malware behavior detected. Immediate action recommended.</div>
+</div>
+
+<script>
+  // ── STATE ──────────────────────────────────────────────────────
+  const state = {
+    totalAlerts: 0,
+    renames: 0,
+    entropyFiles: 0,
+    aiScans: 0,
+    threatLevel: 'low',
+    predictions: [],
+    entropyItems: [],
+    processes: []
+  };
+
+  // ── CLOCK ──────────────────────────────────────────────────────
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('en-US', { hour12: false });
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── THREAT LEVEL ───────────────────────────────────────────────
+  function setThreatLevel(level, aiLabel, confidence) {
+    const banner = document.getElementById('threatBanner');
+    const text = document.getElementById('threatLevelText');
+    const aiResult = document.getElementById('aiResult');
+    const fill = document.getElementById('confidenceFill');
+    const pct = document.getElementById('confidencePct');
+
+    banner.className = 'threat-banner ' + level;
+    text.textContent = level.toUpperCase();
+
+    const isMalware = aiLabel === 'MALWARE';
+    aiResult.textContent = aiLabel;
+    aiResult.className = 'ai-result' + (isMalware ? ' malware' : '');
+    fill.className = 'confidence-fill' + (isMalware ? ' malware' : '');
+    fill.style.width = confidence + '%';
+    pct.textContent = confidence + '%';
+
+    if (isMalware && confidence > 80) {
+      document.getElementById('overlayMsg').textContent =
+        `AI detected ransomware behavior with ${confidence}% confidence. ${state.renames} suspicious file renames detected.`;
+      document.getElementById('malwareOverlay').classList.add('show');
+    }
+  }
+
+  // ── ADD ALERT ──────────────────────────────────────────────────
+  function addAlert(type, message) {
+    const feed = document.getElementById('alertFeed');
+
+    // Clear placeholder
+    const placeholder = feed.querySelector('div[style]');
+    if (placeholder) placeholder.remove();
+
+    state.totalAlerts++;
+    document.getElementById('statAlerts').textContent = state.totalAlerts;
+    document.getElementById('alertCount').textContent = state.totalAlerts + ' EVENTS';
+
+    if (type === 'rename') state.renames++;
+    if (type === 'entropy') state.entropyFiles++;
+
+    document.getElementById('statRenames').textContent = state.renames;
+    document.getElementById('statEntropy').textContent = state.entropyFiles;
+
+    const typeMap = {
+      rename: { cls: 'critical', label: 'SUSPICIOUS RENAME' },
+      entropy: { cls: 'critical', label: 'HIGH ENTROPY FILE' },
+      activity: { cls: 'warning', label: 'HIGH FILE ACTIVITY' },
+      process: { cls: 'warning', label: 'SUSPICIOUS PROCESS' },
+      info: { cls: 'info', label: 'SYSTEM' }
+    };
+
+    const t = typeMap[type] || typeMap.info;
+    const now = new Date().toLocaleTimeString('en-US', { hour12: false });
+
+    const item = document.createElement('div');
+    item.className = `alert-item ${t.cls}`;
+    item.innerHTML = `
+      <div class="alert-time">${now}</div>
+      <div class="alert-content">
+        <div class="alert-type">${t.label}</div>
+        <div class="alert-msg">${message}</div>
+      </div>
+    `;
+
+    feed.insertBefore(item, feed.firstChild);
+
+    // Keep max 100 items
+    while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+
+    // Update threat level
+    updateThreatLevel();
+  }
+
+  // ── ADD PREDICTION ─────────────────────────────────────────────
+  function addPrediction(label, confidence) {
+    state.aiScans++;
+    document.getElementById('statScans').textContent = state.aiScans;
+
+    const list = document.getElementById('predictionList');
+    const placeholder = list.querySelector('div[style]');
+    if (placeholder) placeholder.remove();
+
+    const isMalware = label.toUpperCase() === 'MALWARE';
+    const now = new Date().toLocaleTimeString('en-US', { hour12: false });
+
+    const item = document.createElement('div');
+    item.className = `prediction-item ${isMalware ? 'malware' : ''}`;
+    item.innerHTML = `
+      <div>
+        <div class="pred-label ${isMalware ? 'malware' : 'benign'}">${label.toUpperCase()}</div>
+        <div class="pred-time">${now}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="pred-conf">${confidence}% confidence</div>
+        <div style="margin-top:6px">
+          <div style="width:80px;height:3px;background:var(--border);border-radius:2px;overflow:hidden">
+            <div style="height:100%;width:${confidence}%;background:${isMalware ? 'var(--red)' : 'var(--green)'};border-radius:2px;transition:width 0.5s"></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    list.insertBefore(item, list.firstChild);
+    while (list.children.length > 20) list.removeChild(list.lastChild);
+
+    // Update banner
+    const threatLevel = isMalware ? (confidence > 80 ? 'high' : 'medium') : 'low';
+    setThreatLevel(threatLevel, label.toUpperCase(), confidence);
+  }
+
+  // ── ADD ENTROPY FILE ───────────────────────────────────────────
+  function addEntropyFile(filename, entropy) {
+    const display = document.getElementById('entropyDisplay');
+    const placeholder = display.querySelector('div[style]');
+    if (placeholder) placeholder.remove();
+
+    const pct = (entropy / 8) * 100;
+    const color = entropy > 7.5 ? 'var(--red)' : entropy > 7.0 ? 'var(--yellow)' : 'var(--green)';
+    const shortName = filename.split('\\').pop().split('/').pop();
+
+    const item = document.createElement('div');
+    item.className = 'entropy-bar-item';
+    item.innerHTML = `
+      <div class="entropy-filename" title="${filename}">${shortName}</div>
+      <div class="entropy-track">
+        <div class="entropy-fill" style="width:${pct}%;background:${color};box-shadow:0 0 8px ${color}"></div>
+      </div>
+      <div class="entropy-val" style="color:${color}">${entropy}</div>
+    `;
+
+    display.insertBefore(item, display.firstChild);
+    while (display.children.length > 15) display.removeChild(display.lastChild);
+  }
+
+  // ── UPDATE PROCESSES ───────────────────────────────────────────
+  function updateProcesses(processes) {
+    const list = document.getElementById('processList');
+    const placeholder = list.querySelector('div[style]');
+    if (placeholder) placeholder.remove();
+
+    list.innerHTML = '';
+    document.getElementById('procCount').textContent = processes.length + ' ACTIVE';
+
+    processes.forEach(proc => {
+      const item = document.createElement('div');
+      item.className = `process-item ${proc.suspicious ? 'suspicious' : ''}`;
+      item.innerHTML = `
+        <div class="proc-name">${proc.name}</div>
+        <div class="proc-tag ${proc.suspicious ? 'suspicious' : 'safe'}">${proc.suspicious ? 'SUSPICIOUS' : 'SAFE'}</div>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  function updateThreatLevel() {
+    let level = 'low';
+    if (state.renames > 5 || state.entropyFiles > 3) level = 'medium';
+    if (state.renames > 20 || state.entropyFiles > 8) level = 'high';
+
+    const banner = document.getElementById('threatBanner');
+    const text = document.getElementById('threatLevelText');
+    banner.className = 'threat-banner ' + level;
+    text.textContent = level.toUpperCase();
+    state.threatLevel = level;
+  }
+
+  // ── WEBSOCKET CONNECTION (for real backend) ────────────────────
+  // Uncomment this when connecting to Python backend:
+  
+const ws = new WebSocket('ws://localhost:8765');
+ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === 'alert') addAlert(data.alertType, data.message);
+    if (data.type === 'prediction') addPrediction(data.label, data.confidence);
+    if (data.type === 'entropy') addEntropyFile(data.filename, data.entropy);
+};
+
+ws.onopen = () => {
+    console.log('Connected to SENTINEL backend');
+};
+
+ws.onerror = () => {
+    console.log('Backend not connected');
+};
+</script>
+</body>
+</html>
