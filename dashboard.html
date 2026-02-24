@@ -749,6 +749,9 @@
         <span class="panel-title">// AI Predictions</span>
         <span class="panel-badge">EVERY 5s</span>
       </div>
+      <div id="aiFeatures" style="padding: 12px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--text-dim);">
+        <!-- Features will be injected here -->
+      </div>
       <div class="prediction-list" id="predictionList">
         <div style="padding:20px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;">
           MODEL INITIALIZING...
@@ -809,8 +812,12 @@
     threatLevel: 'low',
     predictions: [],
     entropyItems: [],
-    processes: []
+    processes: [],
+    lastHighThreatTime: 0,
+    lastFeatures: null
   };
+
+  const alertQueue = [];
 
   // ── CLOCK ──────────────────────────────────────────────────────
   function updateClock() {
@@ -821,6 +828,15 @@
   setInterval(updateClock, 1000);
   updateClock();
 
+  // Process alert queue every 500ms to slow down updates
+  setInterval(() => {
+    if (alertQueue.length > 0) {
+      const data = alertQueue.shift();
+      if (data.type === 'alert') addAlert(data.alertType, data.message);
+      if (data.type === 'entropy') addEntropyFile(data.filename, data.entropy);
+    }
+  }, 500);
+
   // ── THREAT LEVEL ───────────────────────────────────────────────
   function setThreatLevel(level, aiLabel, confidence) {
     const banner = document.getElementById('threatBanner');
@@ -828,6 +844,14 @@
     const aiResult = document.getElementById('aiResult');
     const fill = document.getElementById('confidenceFill');
     const pct = document.getElementById('confidencePct');
+
+    const now = Date.now();
+    if (level === 'high' || level === 'medium') {
+      state.lastHighThreatTime = now;
+    } else if (now - state.lastHighThreatTime < 15000) {
+      // Keep it at least medium for 15 seconds after a high/medium event
+      level = state.threatLevel === 'high' ? 'high' : 'medium';
+    }
 
     banner.className = 'threat-banner ' + level;
     text.textContent = level.toUpperCase();
@@ -895,9 +919,40 @@
   }
 
   // ── ADD PREDICTION ─────────────────────────────────────────────
-  function addPrediction(label, confidence) {
+  function addPrediction(label, confidence, features) {
     state.aiScans++;
     document.getElementById('statScans').textContent = state.aiScans;
+
+    // Update feature display if we have new features
+    if (features) {
+      const hasActivity = Object.values(features).some(v => v > 0);
+      if (hasActivity || !state.lastFeatures) {
+        state.lastFeatures = features;
+        const featDiv = document.getElementById('aiFeatures');
+        featDiv.style.display = 'grid';
+        featDiv.innerHTML = '';
+
+        // Show only top relevant features
+        const labels = {
+          'files_malicious': 'MALICIOUS FILES',
+          'files_suspicious': 'SUSPICIOUS FILES',
+          'processes_malicious': 'MALICIOUS PROC',
+          'processes_suspicious': 'SUSPICIOUS PROC',
+          'network_threats': 'NET THREATS',
+          'registry_write': 'REG WRITES'
+        };
+
+        Object.entries(features).forEach(([k, v]) => {
+          if (labels[k]) {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.justifyContent = 'space-between';
+            row.innerHTML = `<span>${labels[k]}</span><span style="color:var(--cyan)">${v}</span>`;
+            featDiv.appendChild(row);
+          }
+        });
+      }
+    }
 
     const list = document.getElementById('predictionList');
     const placeholder = list.querySelector('div[style]');
@@ -1004,9 +1059,11 @@
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === 'alert') addAlert(data.alertType, data.message);
-      if (data.type === 'prediction') addPrediction(data.label, data.confidence);
-      if (data.type === 'entropy') addEntropyFile(data.filename, data.entropy);
+      if (data.type === 'alert' || data.type === 'entropy') {
+        alertQueue.push(data);
+      }
+      if (data.type === 'prediction') addPrediction(data.label, data.confidence, data.features);
+      if (data.type === 'process') updateProcesses(data.processes);
     };
 
     ws.onclose = (e) => {
