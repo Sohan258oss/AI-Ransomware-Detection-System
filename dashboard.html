@@ -987,24 +987,45 @@
     state.threatLevel = level;
   }
 
-  // ── WEBSOCKET CONNECTION (for real backend) ────────────────────
-  // Uncomment this when connecting to Python backend:
-  
-const ws = new WebSocket('ws://localhost:8765');
-ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    if (data.type === 'alert') addAlert(data.alertType, data.message);
-    if (data.type === 'prediction') addPrediction(data.label, data.confidence);
-    if (data.type === 'entropy') addEntropyFile(data.filename, data.entropy);
-};
+  // ── WEBSOCKET CONNECTION ───────────────────────────────────────
+  let ws;
+  function connect() {
+    const wsHost = window.location.hostname || 'localhost';
+    console.log(`Connecting to WebSocket at ws://${wsHost}:8765...`);
+    ws = new WebSocket(`ws://${wsHost}:8765`);
 
-ws.onopen = () => {
-    console.log('Connected to SENTINEL backend');
-};
+    ws.onopen = () => {
+      console.log('Connected to SENTINEL backend');
+      document.getElementById('statusText').textContent = 'MONITORING ACTIVE';
+      document.getElementById('statusText').style.color = '#00ff88';
+      document.getElementById('statusDot').style.background = '#00ff88';
+      document.getElementById('statusDot').style.boxShadow = 'var(--glow-green)';
+    };
 
-ws.onerror = () => {
-    console.log('Backend not connected');
-};
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'alert') addAlert(data.alertType, data.message);
+      if (data.type === 'prediction') addPrediction(data.label, data.confidence);
+      if (data.type === 'entropy') addEntropyFile(data.filename, data.entropy);
+    };
+
+    ws.onclose = (e) => {
+      console.log('Disconnected from SENTINEL backend. Retrying in 2s...', e.reason);
+      document.getElementById('statusText').textContent = 'CONNECTION LOST - RETRYING';
+      document.getElementById('statusText').style.color = '#ff2052';
+      document.getElementById('statusDot').style.background = '#ff2052';
+      document.getElementById('statusDot').style.boxShadow = 'var(--glow-red)';
+      setTimeout(connect, 2000);
+    };
+
+    ws.onerror = (err) => {
+      console.error('WebSocket Error:', err);
+      // ws.close() will trigger onclose and reconnection
+      ws.close();
+    };
+  }
+
+  connect();
 </script>
 </body>
 </html>

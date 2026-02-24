@@ -3,6 +3,7 @@ import time
 import os
 import psutil
 import asyncio
+import re
 from monitor.file_monitor import start_file_monitor
 from monitor.process_monitor import scan_processes
 from ml.predictor import predict
@@ -12,7 +13,11 @@ from websocket_server import start_server, queue_alert
 loop = asyncio.new_event_loop()
 def start_ws():
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(start_server())
+    try:
+        loop.run_until_complete(start_server())
+    except Exception as e:
+        print(f"[!!!] WebSocket Server Thread Error: {e}")
+
 ws_thread = threading.Thread(target=start_ws, daemon=True)
 ws_thread.start()
 
@@ -66,11 +71,25 @@ def handle_alert(message):
     alert_type = 'rename' if 'RENAME' in message else \
                  'entropy' if 'ENTROPY' in message else \
                  'process' if 'PROCESS' in message else 'activity'
+
+    # Send basic alert
     asyncio.run_coroutine_threadsafe(queue_alert({
         'type': 'alert',
         'alertType': alert_type,
         'message': message
     }), loop)
+
+    # Special handling for entropy to update the entropy monitor in real-time
+    if alert_type == 'entropy':
+        match = re.search(r"HIGH ENTROPY FILE: (.*) \(entropy=(.*)\)", message)
+        if match:
+            filename = match.group(1)
+            entropy_val = float(match.group(2))
+            asyncio.run_coroutine_threadsafe(queue_alert({
+                'type': 'entropy',
+                'filename': filename,
+                'entropy': entropy_val
+            }), loop)
 
 def kill_suspicious_process(name):
     for proc in psutil.process_iter(['pid', 'name']):
