@@ -26,7 +26,7 @@ FEATURES = [
     'processes_malicious',
     'processes_suspicious',
     'processes_monitored',
-    'total_procsses',
+    'total_processes',
     'files_malicious',
     'files_suspicious',
     'files_text',

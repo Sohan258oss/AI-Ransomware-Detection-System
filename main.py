@@ -37,7 +37,7 @@ behavior_window = {
     'registry_read': 0, 'registry_write': 0, 'registry_delete': 0,
     'registry_total': 0, 'network_threats': 0, 'network_dns': 0,
     'network_http': 0, 'network_connections': 0, 'processes_malicious': 0,
-    'processes_suspicious': 0, 'processes_monitored': 0, 'total_procsses': 0,
+    'processes_suspicious': 0, 'processes_monitored': 0, 'total_processes': 0,
     'files_malicious': 0, 'files_suspicious': 0, 'files_text': 0,
     'files_unknown': 0, 'dlls_calls': 0, 'apis': 0
 }
@@ -54,23 +54,24 @@ def handle_alert(message):
     log_to_file(log)
     stats['total_alerts'] += 1
 
-    if 'RENAME' in message:
+    msg_upper = message.upper()
+    if 'RENAME' in msg_upper:
         behavior_window['files_malicious'] += 10
         behavior_window['processes_malicious'] += 2
-    if 'ENTROPY' in message:
+    if 'ENTROPY' in msg_upper:
         behavior_window['files_suspicious'] += 10
         behavior_window['files_malicious'] += 8
         behavior_window['network_threats'] += 3
         stats['high_entropy_files'] += 1
-    if 'PROCESS' in message:
+    if 'PROCESS' in msg_upper:
         behavior_window['processes_suspicious'] += 1
-    if 'ACTIVITY' in message:
+    if 'ACTIVITY' in msg_upper:
         behavior_window['files_unknown'] += 2
-        behavior_window['total_procsses'] += 1
+        behavior_window['total_processes'] += 1
 
-    alert_type = 'rename' if 'RENAME' in message else \
-                 'entropy' if 'ENTROPY' in message else \
-                 'process' if 'PROCESS' in message else 'activity'
+    alert_type = 'rename' if 'RENAME' in msg_upper else \
+                 'entropy' if 'ENTROPY' in msg_upper else \
+                 'process' if 'PROCESS' in msg_upper else 'activity'
 
     # Send basic alert
     asyncio.run_coroutine_threadsafe(queue_alert({
@@ -128,11 +129,34 @@ def run_ai_prediction():
         asyncio.run_coroutine_threadsafe(queue_alert({
             'type': 'prediction',
             'label': label,
-            'confidence': confidence
+            'confidence': confidence,
+            'features': dict(behavior_window)
         }), loop)
 
         for key in behavior_window:
             behavior_window[key] = 0
+
+def process_monitor_loop():
+    while True:
+        processes = []
+        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent']):
+            try:
+                processes.append({
+                    'name': proc.info['name'],
+                    'cpu': proc.info['cpu_percent'] or 0,
+                    'suspicious': proc.info['name'].lower() in ['vssadmin.exe', 'bcdedit.exe', 'powershell.exe', 'cipher.exe']
+                })
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
+        processes.sort(key=lambda x: x['cpu'], reverse=True)
+        top_processes = processes[:10]
+
+        asyncio.run_coroutine_threadsafe(queue_alert({
+            'type': 'process',
+            'processes': top_processes
+        }), loop)
+        time.sleep(3)
 
 def print_dashboard():
     while True:
@@ -172,6 +196,9 @@ if __name__ == "__main__":
 
     ai_thread = threading.Thread(target=run_ai_prediction, daemon=True)
     ai_thread.start()
+
+    proc_list_thread = threading.Thread(target=process_monitor_loop, daemon=True)
+    proc_list_thread.start()
 
     dashboard_thread = threading.Thread(target=print_dashboard, daemon=True)
     dashboard_thread.start()

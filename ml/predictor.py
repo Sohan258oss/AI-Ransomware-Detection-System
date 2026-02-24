@@ -16,7 +16,7 @@ FEATURES = [
     'registry_read', 'registry_write', 'registry_delete', 'registry_total',
     'network_threats', 'network_dns', 'network_http', 'network_connections',
     'processes_malicious', 'processes_suspicious', 'processes_monitored',
-    'total_procsses', 'files_malicious', 'files_suspicious', 'files_text',
+    'total_processes', 'files_malicious', 'files_suspicious', 'files_text',
     'files_unknown', 'dlls_calls', 'apis'
 ]
 
