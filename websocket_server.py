@@ -39,17 +39,22 @@ async def process_queue():
     while True:
         while alert_queue and connected_clients:
             data = alert_queue.popleft()
-            message = json.dumps(data)
-            # Send to all connected clients
-            results = await asyncio.gather(
-                *[c.send(message) for c in connected_clients],
-                return_exceptions=True
-            )
-            for res in results:
-                if isinstance(res, Exception):
-                    print(f"[!] Broadcast error: {res}")
-                else:
-                    print(f"[*] Broadcast message: {data.get('type')} to {len(results)} clients")
+            try:
+                message = json.dumps(data)
+                # Send to all connected clients
+                results = await asyncio.gather(
+                    *[c.send(message) for c in connected_clients],
+                    return_exceptions=True
+                )
+                for res in results:
+                    if isinstance(res, Exception):
+                        print(f"[!] Broadcast error: {res}")
+                    else:
+                        print(f"[*] Broadcast message: {data.get('type')} to {len(results)} clients")
+            except Exception as e:
+                print(f"[!] Serialization/Broadcast error for {data.get('type')}: {e}")
+                import traceback
+                traceback.print_exc()
         await asyncio.sleep(0.1)
 
 async def start_server():
