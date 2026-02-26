@@ -36,7 +36,7 @@ def predict(features: dict) -> dict:
     confidence = round(max(probability) * 100, 2)
     
     return {
-        'label': label,
-        'confidence': confidence,
-        'is_ransomware': label == 'Malware'
+        'label': str(label),
+        'confidence': float(confidence),
+        'is_ransomware': bool(label == 'Malware')
     }

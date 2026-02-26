@@ -118,41 +118,47 @@ def kill_suspicious_process(name):
 def run_ai_prediction():
     while not stop_event.is_set():
         time.sleep(5)
-        result = predict(behavior_window)
+        try:
+            result = predict(behavior_window)
 
-        label = result['label']
-        confidence = result['confidence']
+            label = result['label']
+            confidence = result['confidence']
 
-        if result['is_ransomware']:
-            stats['ransomware_predictions'] += 1
-        else:
-            stats['benign_predictions'] += 1
+            if result['is_ransomware']:
+                stats['ransomware_predictions'] += 1
+            else:
+                stats['benign_predictions'] += 1
 
-        status = f"[AI] Prediction: {label} | Confidence: {confidence}%"
-        print(status)
-        log_to_file(status)
+            status = f"[AI] Prediction: {label} | Confidence: {confidence}%"
+            print(status)
+            log_to_file(status)
 
-        if result['is_ransomware'] and confidence > 80:
-            warning = f"[!!!] HIGH RISK RANSOMWARE DETECTED! Confidence: {confidence}%"
-            print(warning)
-            log_to_file(warning)
+            if result['is_ransomware'] and confidence > 80:
+                warning = f"[!!!] HIGH RISK RANSOMWARE DETECTED! Confidence: {confidence}%"
+                print(warning)
+                log_to_file(warning)
 
-        asyncio.run_coroutine_threadsafe(queue_alert({
-            'type': 'prediction',
-            'label': label,
-            'confidence': confidence,
-            'features': dict(behavior_window)
-        }), loop)
+            asyncio.run_coroutine_threadsafe(queue_alert({
+                'type': 'prediction',
+                'label': label,
+                'confidence': confidence,
+                'features': dict(behavior_window)
+            }), loop)
 
-        # Broadcast overall stats
-        asyncio.run_coroutine_threadsafe(queue_alert({
-            'type': 'stats',
-            'stats': dict(stats)
-        }), loop)
+            # Broadcast overall stats
+            asyncio.run_coroutine_threadsafe(queue_alert({
+                'type': 'stats',
+                'stats': dict(stats)
+            }), loop)
 
-        # Decaying window instead of hard reset
-        for key in behavior_window:
-            behavior_window[key] = int(behavior_window[key] * 0.5)
+            # Decaying window instead of hard reset
+            for key in behavior_window:
+                behavior_window[key] = int(behavior_window[key] * 0.5)
+
+        except Exception as e:
+            print(f"[!] AI Prediction Error: {e}")
+            import traceback
+            traceback.print_exc()
 
 def process_monitor_loop():
     while not stop_event.is_set():
