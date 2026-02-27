@@ -737,7 +737,7 @@
         <span class="panel-badge" id="alertCount">0 EVENTS</span>
       </div>
       <div class="alert-feed" id="alertFeed">
-        <div style="padding:40px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:2px;">
+        <div id="alertPlaceholder" style="padding:40px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:2px;">
           AWAITING ACTIVITY...
         </div>
       </div>
@@ -753,7 +753,7 @@
         <!-- Features will be injected here -->
       </div>
       <div class="prediction-list" id="predictionList">
-        <div style="padding:20px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;">
+        <div id="predPlaceholder" style="padding:20px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;">
           MODEL INITIALIZING...
         </div>
       </div>
@@ -769,7 +769,7 @@
         <span class="panel-badge">THRESHOLD: 7.2</span>
       </div>
       <div class="entropy-display" id="entropyDisplay">
-        <div style="padding:20px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;">
+        <div id="entropyPlaceholder" style="padding:20px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;">
           NO HIGH ENTROPY FILES DETECTED
         </div>
       </div>
@@ -782,7 +782,7 @@
         <span class="panel-badge" id="procCount">SCANNING...</span>
       </div>
       <div class="process-list" id="processList">
-        <div style="padding:20px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;">
+        <div id="procPlaceholder" style="padding:20px;text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;">
           SCANNING PROCESSES...
         </div>
       </div>
@@ -876,7 +876,7 @@
     const feed = document.getElementById('alertFeed');
 
     // Clear placeholder
-    const placeholder = feed.querySelector('div[style]');
+    const placeholder = document.getElementById('alertPlaceholder');
     if (placeholder) placeholder.remove();
 
     state.totalAlerts++;
@@ -956,7 +956,7 @@
     }
 
     const list = document.getElementById('predictionList');
-    const placeholder = list.querySelector('div[style]');
+    const placeholder = document.getElementById('predPlaceholder');
     if (placeholder) placeholder.remove();
 
     const isMalware = label.toUpperCase() === 'MALWARE';
@@ -990,7 +990,7 @@
   // ── ADD ENTROPY FILE ───────────────────────────────────────────
   function addEntropyFile(filename, entropy) {
     const display = document.getElementById('entropyDisplay');
-    const placeholder = display.querySelector('div[style]');
+    const placeholder = document.getElementById('entropyPlaceholder');
     if (placeholder) placeholder.remove();
 
     const pct = (entropy / 8) * 100;
@@ -1014,7 +1014,7 @@
   // ── UPDATE PROCESSES ───────────────────────────────────────────
   function updateProcesses(processes) {
     const list = document.getElementById('processList');
-    const placeholder = list.querySelector('div[style]');
+    const placeholder = document.getElementById('procPlaceholder');
     if (placeholder) placeholder.remove();
 
     list.innerHTML = '';
